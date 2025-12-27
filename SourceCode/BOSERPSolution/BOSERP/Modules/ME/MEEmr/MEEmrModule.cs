@@ -12138,7 +12138,9 @@ namespace BOSERP.Modules.MEEmr
             string fileName = string.Format(@"{0}\Emr\{1}\{2}.docx", _documentPath, document.FK_MEEmrID, document.MEEmrDocumentFile);
             this._emrDocumentHelper.SignRange(doc.Range, true, "CA Digital Signature", "Ký bằng chứng thư số bởi");
 
-            byte[] signImage = ResizeImage(BOSApp.CurrentEmployeesInfo.HREmployeeSignature, 100, 50);
+            int signWidth = template.METemplateDgtSignatureWidth > 0 ? template.METemplateDgtSignatureWidth : 100;
+            int signHeght = template.METemplateDgtSignatureHeight > 0 ? template.METemplateDgtSignatureHeight : 50;
+            byte[] signImage = ResizeImage(BOSApp.CurrentEmployeesInfo.HREmployeeSignature, signWidth, signHeght);
 
             string signature = template.METemplateDgtSignatureImage ? Convert.ToBase64String(signImage) : string.Empty;
             // thuc hien ky so CA tren toan bo file
@@ -12222,29 +12224,92 @@ namespace BOSERP.Modules.MEEmr
         }
         private byte[] ResizeImage(byte[] imageBytes, int width, int height)
         {
-            using (var inputStream = new MemoryStream(imageBytes))
-            using (var sourceImage = Image.FromStream(inputStream))
+            //using (var inputStream = new MemoryStream(imageBytes))
+            //using (var image = Image.FromStream(inputStream))
+            //using (var destImage = new Bitmap(width, height))
+            //{
+            //    destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
+
+            //    using (var graphics = Graphics.FromImage(destImage))
+            //    {
+            //        graphics.CompositingMode = CompositingMode.SourceCopy;
+            //        graphics.CompositingQuality = CompositingQuality.HighQuality;
+            //        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            //        graphics.SmoothingMode = SmoothingMode.HighQuality;
+            //        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+            //        using (var wrapMode = new ImageAttributes())
+            //        {
+            //            wrapMode.SetWrapMode(WrapMode.TileFlipXY);
+            //            graphics.DrawImage(image, new System.Drawing.Rectangle(0, 0, width, height));
+            //        }
+            //    }
+
+            //    using (var outputStream = new MemoryStream())
+            //    {
+            //        // Convert thành PNG giúp giữ trong suốt
+            //        destImage.Save(outputStream, ImageFormat.Png);
+            //        return outputStream.ToArray();
+            //    }
+            //}
+
+            Image image = null;
+
+            using (MemoryStream ms = new MemoryStream(imageBytes))
             {
-                // Tạo bitmap mới theo size mong muốn
-                var newBitmap = new Bitmap(width, height);
+                image = Image.FromStream(ms);
+            }
 
-                using (var graphics = Graphics.FromImage(newBitmap))
+            var destRect = new System.Drawing.Rectangle(0, 0, width, height);
+            var destImage = new Bitmap(width, height);
+
+            destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
+
+            using (var graphics = Graphics.FromImage(destImage))
+            {
+                graphics.CompositingMode = CompositingMode.SourceCopy;
+                graphics.CompositingQuality = CompositingQuality.HighQuality;
+                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.SmoothingMode = SmoothingMode.HighQuality;
+                graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                using (var wrapMode = new ImageAttributes())
                 {
-                    graphics.CompositingQuality = CompositingQuality.HighQuality;
-                    graphics.SmoothingMode = SmoothingMode.HighQuality;
-                    graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-
-                    // Vẽ ảnh đã resize
-                    graphics.DrawImage(sourceImage, 0, 0, width, height);
-                }
-
-                using (var outputStream = new MemoryStream())
-                {
-                    // Lưu ra định dạng JPEG/PNG
-                    newBitmap.Save(outputStream, ImageFormat.Jpeg);
-                    return outputStream.ToArray();
+                    wrapMode.SetWrapMode(WrapMode.TileFlipXY);
+                    graphics.DrawImage(image, destRect, 0, 0, width, height, GraphicsUnit.Pixel, wrapMode);
                 }
             }
+            byte[] imageBytesReturn = null;
+            using (MemoryStream ms2 = new MemoryStream())
+            {
+                destImage.Save(ms2, image.RawFormat);
+                imageBytesReturn = ms2.ToArray();
+            }
+            return imageBytesReturn;
+
+            //using (var inputStream = new MemoryStream(imageBytes))
+            //using (var sourceImage = Image.FromStream(inputStream))
+            //{
+            //    // Tạo bitmap mới theo size mong muốn
+            //    var newBitmap = new Bitmap(width, height);
+
+            //    using (var graphics = Graphics.FromImage(newBitmap))
+            //    {
+            //        graphics.CompositingQuality = CompositingQuality.HighQuality;
+            //        graphics.SmoothingMode = SmoothingMode.HighQuality;
+            //        graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+
+            //        // Vẽ ảnh đã resize
+            //        graphics.DrawImage(sourceImage, 0, 0, width, height);
+            //    }
+
+            //    using (var outputStream = new MemoryStream())
+            //    {
+            //        // Lưu ra định dạng JPEG/PNG
+            //        newBitmap.Save(outputStream, ImageFormat.Jpeg);
+            //        return outputStream.ToArray();
+            //    }
+            //}
         }
         private void DigitalSignPdfDocument(MEEmrDocumentsInfo document)
         {
@@ -12273,8 +12338,9 @@ namespace BOSERP.Modules.MEEmr
             var byteContent = File.ReadAllBytes(filePath);
             var hash = _hashProvider.ComputeHash(byteContent);
 
-            byte[] signImage = ResizeImage(BOSApp.CurrentEmployeesInfo.HREmployeeSignature,100,50);
-
+            int signWidth = template.METemplateDgtSignatureWidth > 0 ? template.METemplateDgtSignatureWidth : 100;
+            int signHeght = template.METemplateDgtSignatureHeight > 0 ? template.METemplateDgtSignatureHeight : 50;
+            byte[] signImage = ResizeImage(BOSApp.CurrentEmployeesInfo.HREmployeeSignature, signWidth, signHeght);
 
             string signature = template.METemplateDgtSignatureImage ? Convert.ToBase64String(signImage) : string.Empty;
 
@@ -12297,8 +12363,8 @@ namespace BOSERP.Modules.MEEmr
             DigitalSignatureRect rect = new DigitalSignatureRect();
             rect.StartX = template.METemplateDgtSignatureX;
             rect.StartY = template.METemplateDgtSignatureY;
-            rect.EndX = template.METemplateDgtSignatureX + template.METemplateDgtSignatureWidth;
-            rect.EndY = template.METemplateDgtSignatureY - template.METemplateDgtSignatureHeight;
+            rect.EndX = template.METemplateDgtSignatureX + signWidth;
+            rect.EndY = template.METemplateDgtSignatureY - signHeght;
 
             lstRect.Add(rect);
             digitalSignature.pageSign = page;
